@@ -29,6 +29,6 @@
         public string ModifiedDate { get; set; }
 
         [JsonProperty("id", NullValueHandling = NullValueHandling.Ignore)]
-        public int? DocumentId { get; set; }
+        public string DocumentId { get; set; }
     }
 }

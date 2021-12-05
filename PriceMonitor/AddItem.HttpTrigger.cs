@@ -10,16 +10,20 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using PriceMonitor.Models;
 using System.Net.Mail;
+using PriceMonitor.Services;
 
 namespace PriceMonitor
 {
     public class AddItem
     {
         private ILogger<AddItem> _log;
-        public AddItem(ILogger<AddItem> logger)
+        private readonly ICosmosDbService _cosmosDbService;
+        public AddItem(ILogger<AddItem> logger, ICosmosDbService cosmosDbService)
         {
             this._log = logger;
+            this._cosmosDbService = cosmosDbService;
         }
+
         [FunctionName("AddItem")]
         public async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "item")] HttpRequest req)
@@ -28,36 +32,74 @@ namespace PriceMonitor
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             Item itemAdd = JsonConvert.DeserializeObject<Item>(requestBody);
+            StringBuilder builder = Validate(itemAdd);
 
-            string responseMessage = "hello";
+            if(builder.Length > 0)
+            {
+                return new BadRequestObjectResult(HandleResponse("404", builder.ToString()));
+            }
 
-            return new OkObjectResult(responseMessage);
+            try
+            {
+                _log.LogInformation(JsonConvert.SerializeObject(itemAdd));
+
+                await AddItemAysnc(itemAdd);
+                return new OkObjectResult(HandleResponse("200", "Success"));
+            }
+            catch(Exception ex)
+            {
+                string errorGuid = (Guid.NewGuid()).ToString();
+                _log.LogError($"Encountered error - trace code {errorGuid} - {ex}");
+
+                return new BadRequestObjectResult(HandleResponse("404", $"Encountered error - trace code {errorGuid}"));
+            }
+
         }
 
-        private bool IsValid(Item item)
+        private async Task AddItemAysnc(Item item)
+        {
+            item.DocumentId = (Guid.NewGuid()).ToString();
+            string date = DateTime.Now.ToString("o");
+            item.CreatedDate = date;
+            item.ModifiedDate = date;
+
+            await _cosmosDbService.AddItemAsync(item);
+        }
+
+        private Response HandleResponse(string code, string message)
+        {
+            return new Response()
+            { 
+                ResponseCode = code,
+                Message = message
+            
+            };
+
+        }
+        private StringBuilder Validate(Item item)
         {
             StringBuilder stringBuilder = new StringBuilder();
             string prefix = "Item property";
-            string suffix = "was expected but received null or empty.\n";
+            string suffix = "was expected but received null or empty. ";
 
             if(string.IsNullOrEmpty(item.Name))
             {
-                stringBuilder.Append($"{prefix} name {suffix}");
+                stringBuilder.Append($"{prefix} 'name' {suffix}");
             }
 
             if(item.Sku == default)
             {
-                stringBuilder.Append($"{prefix} sku {suffix}");
+                stringBuilder.Append($"{prefix} 'sku' {suffix}");
             }
 
             if (item.TargetPrice == default)
             {
-                stringBuilder.Append($"{prefix} targetPrice {suffix}");
+                stringBuilder.Append($"{prefix} 'targetPrice' {suffix}");
             }
 
             if(string.IsNullOrEmpty(item.Email))
             {
-                stringBuilder.Append($"{prefix} email {suffix}");
+                stringBuilder.Append($"{prefix} 'email' {suffix}");
             }
             else
             {
@@ -71,12 +113,7 @@ namespace PriceMonitor
                 }
             }
 
-            if(stringBuilder.Length == 0)
-            {
-                return true;
-            }
-            
-            return false;
+            return stringBuilder;
         }
     }
 }
