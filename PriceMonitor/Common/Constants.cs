@@ -4,9 +4,8 @@
     {
         public struct Cosmos
         {
-            public const string DatabaseId = "pricecatalog";
-            public const string CollectionId = "bestbuyprices";
-            public const string PartitionKey = "/name";
+            public const string DatabaseIdKey = "Database-Id";
+            public const string CollectionIdKey = "Collection-Id";
             public const string ConnStringKey = "Cosmos-Connection-String";
         }
 

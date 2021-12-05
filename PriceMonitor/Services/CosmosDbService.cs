@@ -15,7 +15,9 @@ namespace PriceMonitor.Services
 
         public CosmosDbService(CosmosClient cosmosClient)
         {
-            _container = cosmosClient.GetContainer(Constants.Cosmos.DatabaseId, Constants.Cosmos.CollectionId);
+            string dbId = Utility.GetEnvironmentValue(Constants.Cosmos.DatabaseIdKey);
+            string colId = Utility.GetEnvironmentValue(Constants.Cosmos.CollectionIdKey);
+            _container = cosmosClient.GetContainer(dbId, colId);
         }
         public async Task AddItemAsync(Item item)
         {
